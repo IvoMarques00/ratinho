@@ -5,6 +5,20 @@
  * compiler.
  */
 
+/** Uniform names declared more than once in an assembled source — a GLSL compile error, but cheap to catch without a GPU. */
+export function findDuplicateUniformDeclarations(assembledSource: string): string[] {
+  const counts = new Map<string, number>();
+  const declRegex = /uniform\s+\w+\s+(\w+)\s*;/g;
+  for (const m of assembledSource.matchAll(declRegex)) {
+    const name = m[1]!;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .filter(([, count]) => count > 1)
+    .map(([name]) => name)
+    .sort();
+}
+
 /** Names matching the `u<Capital>...` convention that are used but never `uniform`-declared in the given (already-assembled) source. */
 export function findPossiblyUndeclaredUniforms(assembledSource: string): string[] {
   const declared = new Set<string>();

@@ -21,6 +21,7 @@ export interface PlannedPass {
   blend: NonNullable<PassSpec["blend"]>;
   passIndex: number;
   uniformsFn?: PassSpec["uniforms"];
+  declarations?: string;
 }
 
 export interface RenderPlan {
@@ -129,6 +130,7 @@ export function planPasses(effect: EffectDefinition, params: ResolvedParams, can
       blend: spec.blend ?? "none",
       passIndex: index,
       uniformsFn: spec.uniforms,
+      declarations: spec.declarations,
     });
 
     previousOutputName = outputName;

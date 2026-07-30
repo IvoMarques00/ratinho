@@ -70,6 +70,15 @@ describe("buildFragmentSource", () => {
     expect(source).not.toContain("uniform float uAngle;");
   });
 
+  it("splices in a pass's extra GLSL declarations for JS-computed uniforms", () => {
+    const source = buildFragmentSource(
+      makeEffect(),
+      makePass({ fragment: "fragColor = texture(uSource, vUv + uDir * uRadius);", declarations: "uniform vec2 uDir;\nuniform float uRadius;\n" }),
+    );
+    expect(source).toContain("uniform vec2 uDir;");
+    expect(source).toContain("uniform float uRadius;");
+  });
+
   it("only inlines stdlib chunks the fragment body actually references", () => {
     const withRot = buildFragmentSource(makeEffect(), makePass({ fragment: "vec2 p = rot2(1.0) * vUv;" }));
     expect(withRot).toContain("mat2 rot2(float a)");

@@ -98,8 +98,10 @@ export interface PassSpec {
   /** Defaults to "rgba16f", except the pass writing to "output", which must be "rgba8" (or omitted). */
   format?: PassFormat;
   blend?: PassBlend;
-  /** Extra per-pass uniform values computed in JS (e.g. blur direction vectors). */
+  /** Extra per-pass uniform values computed in JS (e.g. blur direction vectors), keyed by GLSL name. */
   uniforms?: (ctx: PassContext) => Record<string, number | number[] | boolean>;
+  /** Raw GLSL `uniform` declaration lines for any names used by `uniforms` that aren't effect-schema uniforms or pass inputs (e.g. `"uniform vec2 uDir;\n"`). */
+  declarations?: string;
 }
 
 export interface EffectDefinition {

@@ -13,8 +13,12 @@ import type { RGBAImage } from "ani-core";
 
 const INGEST_FRAGMENT_SOURCE = `${FRAGMENT_PRELUDE}
 uniform sampler2D uUpload;
+// Fraction of the canvas each axis of the (possibly non-square, aspect-fit)
+// source occupies — distinct from the built-in uContentScale, which
+// describes the square content box, not the source's own aspect ratio.
+uniform vec2 uFitScale;
 void main() {
-  vec2 centered = (vUv - 0.5) / uContentScale + 0.5;
+  vec2 centered = (vUv - 0.5) / uFitScale + 0.5;
   if (centered.x < 0.0 || centered.x > 1.0 || centered.y < 0.0 || centered.y > 1.0) {
     fragColor = vec4(0.0);
     return;
@@ -78,7 +82,16 @@ export class ShaderRenderer {
     }
 
     const sourceTarget = this.targets.get("source");
-    const contentScale = opts.sourceImage.width / opts.canvasSize;
+
+    // Fraction of the (square) canvas the source's content box occupies,
+    // derived purely from the effect's padding — independent of the
+    // source image's native pixel resolution.
+    const contentBoxFraction = 1 / (1 + 2 * effect.padding);
+    // The source is fit ("contain"-style) into that square content box,
+    // preserving its own aspect ratio rather than being stretched.
+    const aspect = opts.sourceImage.width / opts.sourceImage.height;
+    const fitScale: [number, number] =
+      aspect >= 1 ? [contentBoxFraction, contentBoxFraction / aspect] : [contentBoxFraction * aspect, contentBoxFraction];
 
     // Ingest pass: upload the raw source image, then draw it centered/padded/premultiplied into "source".
     const uploadTex = uploadImageTexture(gl, opts.sourceImage);
@@ -90,21 +103,24 @@ export class ShaderRenderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, uploadTex);
     setUniform(gl, this.ingestProgram, "uUpload", 0);
-    setUniform(gl, this.ingestProgram, "uContentScale", contentScale);
+    setUniform(gl, this.ingestProgram, "uFitScale", fitScale);
     drawFullscreenTriangle(gl, this.quadVao);
     gl.deleteTexture(uploadTex);
 
     const phase = phaseForFrame(opts.frameIndex, opts.frameCount);
-    const builtins: Record<string, number | number[]> = {
+    // uResolution/uTexel are set per-pass below, from that pass's own
+    // output target size — NOT a single frame-wide constant — since
+    // passes commonly render into downscaled buffers (e.g. a bloom blur
+    // at 1/4 resolution), and a blur radius expressed in texels must be
+    // relative to the buffer it's actually sampling.
+    const frameBuiltins: Record<string, number | number[]> = {
       uPhase: phase,
       uTime: opts.frameIndex / opts.fps,
       uFrame: opts.frameIndex,
       uFrameCount: opts.frameCount,
-      uResolution: [opts.canvasSize, opts.canvasSize],
-      uTexel: [1 / opts.canvasSize, 1 / opts.canvasSize],
       uSupersample: opts.supersample ?? 1,
       uSeed: opts.seed ?? 0,
-      uContentScale: contentScale,
+      uContentScale: contentBoxFraction,
     };
 
     for (const plannedPass of plan.passes) {
@@ -127,9 +143,11 @@ export class ShaderRenderer {
         unit++;
       }
 
-      for (const [name, value] of Object.entries(builtins)) {
+      for (const [name, value] of Object.entries(frameBuiltins)) {
         setUniform(gl, compiled, name, value);
       }
+      setUniform(gl, compiled, "uResolution", [outputTarget.width, outputTarget.height]);
+      setUniform(gl, compiled, "uTexel", [1 / outputTarget.width, 1 / outputTarget.height]);
 
       for (const [key, spec] of Object.entries(effect.schema)) {
         const glslName = spec.glslName ?? `u${key.charAt(0).toUpperCase()}${key.slice(1)}`;

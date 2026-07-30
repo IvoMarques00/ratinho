@@ -39,6 +39,10 @@ export function buildFragmentSource(effect: EffectDefinition, pass: PlannedPass)
     parts.push(`uniform ${uniformGlslType(spec.type)} ${glslName};\n`);
   }
 
+  if (pass.declarations) {
+    parts.push(pass.declarations);
+  }
+
   for (const [name, chunk] of Object.entries(GLSL_LIB)) {
     if (new RegExp(`\\b${name}\\b`).test(pass.fragment)) {
       parts.push(chunk);
