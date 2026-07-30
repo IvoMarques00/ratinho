@@ -11,3 +11,8 @@ export * from "./glsl/assemble.js";
 export * from "./glsl/lint.js";
 export { GLSL_LIB } from "./glsl/lib.js";
 export { FRAGMENT_PRELUDE, VERTEX_SHADER_SOURCE } from "./glsl/prelude.js";
+// Effect definitions are just data (schema + GLSL source strings) — no GL
+// context needed to enumerate/describe them, so this is safe from the
+// pure entry point too (lets e.g. `--list-effects` avoid launching a
+// browser just to answer "what effects exist").
+export * from "./effects/index.js";
