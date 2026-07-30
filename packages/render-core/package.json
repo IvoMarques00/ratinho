@@ -27,7 +27,7 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:gl": "vitest run --config vitest.e2e.config.ts",
+    "test:gl": "node scripts/run-e2e.mjs",
     "check:gl": "node scripts/check-webgl.mjs"
   },
   "dependencies": {

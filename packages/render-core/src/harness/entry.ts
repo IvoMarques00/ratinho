@@ -53,7 +53,11 @@ function autoSupersample(size: number): number {
   return Math.min(4, Math.max(1, Math.floor(256 / size)));
 }
 
-function bakeFrames(req: BakeRequest): BakedFramePayload[] {
+export function listEffectIds(): string[] {
+  return listEffects().map((e) => e.id);
+}
+
+export function bakeFrames(req: BakeRequest): BakedFramePayload[] {
   const effect = getEffect(req.effectId);
   const resolved = resolveParams(effect.schema, req.params ?? {});
   const supersample = req.supersample ?? autoSupersample(req.size);
@@ -93,16 +97,3 @@ function bakeFrames(req: BakeRequest): BakedFramePayload[] {
   return out;
 }
 
-declare global {
-  interface Window {
-    RatinhoRender: {
-      listEffectIds: () => string[];
-      bakeFrames: (req: BakeRequest) => BakedFramePayload[];
-    };
-  }
-}
-
-window.RatinhoRender = {
-  listEffectIds: () => listEffects().map((e) => e.id),
-  bakeFrames,
-};
