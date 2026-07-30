@@ -1,10 +1,12 @@
 import { bloomPulseEffect } from "./bloomPulse.js";
 import { passthroughEffect } from "./passthrough.js";
+import { prismSpinEffect } from "./prismSpin.js";
 import type { EffectDefinition } from "../types.js";
 
 export const EFFECTS: Record<string, EffectDefinition> = {
   [passthroughEffect.id]: passthroughEffect,
   [bloomPulseEffect.id]: bloomPulseEffect,
+  [prismSpinEffect.id]: prismSpinEffect,
 };
 
 export function listEffects(): EffectDefinition[] {
@@ -21,3 +23,4 @@ export function getEffect(id: string): EffectDefinition {
 
 export { passthroughEffect } from "./passthrough.js";
 export { bloomPulseEffect } from "./bloomPulse.js";
+export { prismSpinEffect } from "./prismSpin.js";
