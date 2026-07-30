@@ -6,11 +6,12 @@ import { drawCheckerboard } from "../lib/canvas";
 interface LivePreviewProps {
   frames: Frame[] | null;
   baseSize: CursorSize;
+  status?: "idle" | "baking" | "ready" | "error";
 }
 
 const DISPLAY_SCALE = 8;
 
-export function LivePreview({ frames, baseSize }: LivePreviewProps) {
+export function LivePreview({ frames, baseSize, status = "ready" }: LivePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const resizedFrames = useMemo(
@@ -29,8 +30,9 @@ export function LivePreview({ frames, baseSize }: LivePreviewProps) {
     ctx.imageSmoothingEnabled = false;
 
     let index = 0;
-    let timeoutId: ReturnType<typeof setTimeout>;
-    let cancelled = false;
+    let elapsedInFrame = 0;
+    let lastTimestamp: number | null = null;
+    let rafId: number;
 
     function draw() {
       if (!ctx || !resizedFrames) return;
@@ -40,35 +42,48 @@ export function LivePreview({ frames, baseSize }: LivePreviewProps) {
       ctx.putImageData(new ImageData(frame.data, baseSize, baseSize), 0, 0);
     }
 
-    function tick() {
-      if (cancelled || !resizedFrames) return;
-      draw();
-      const delay = Math.max(16, resizedFrames[index]!.delayMs);
-      timeoutId = setTimeout(() => {
-        index = (index + 1) % resizedFrames.length;
-        tick();
-      }, delay);
+    function tick(timestamp: number) {
+      if (!resizedFrames) return;
+      if (lastTimestamp === null) {
+        lastTimestamp = timestamp;
+        draw();
+      } else {
+        const dt = timestamp - lastTimestamp;
+        lastTimestamp = timestamp;
+        elapsedInFrame += dt;
+        const currentDelay = Math.max(16, resizedFrames[index]!.delayMs);
+        if (elapsedInFrame >= currentDelay) {
+          elapsedInFrame -= currentDelay;
+          index = (index + 1) % resizedFrames.length;
+          draw();
+        }
+      }
+      rafId = requestAnimationFrame(tick);
     }
 
-    tick();
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
   }, [resizedFrames, baseSize]);
 
   return (
     <div className="flex flex-col items-center gap-2">
       <p className="text-sm font-medium text-neutral-200">Live preview</p>
       {resizedFrames ? (
-        <canvas
-          ref={canvasRef}
-          style={{ width: baseSize * DISPLAY_SCALE, height: baseSize * DISPLAY_SCALE, imageRendering: "pixelated" }}
-          className="rounded border border-neutral-700"
-        />
+        <div className="relative">
+          <canvas
+            ref={canvasRef}
+            style={{ width: baseSize * DISPLAY_SCALE, height: baseSize * DISPLAY_SCALE, imageRendering: "pixelated" }}
+            className="rounded border border-neutral-700"
+          />
+          {status === "baking" && (
+            <div className="absolute inset-0 flex items-center justify-center rounded bg-neutral-950/60 text-xs text-neutral-300">
+              Rendering…
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex h-40 w-40 items-center justify-center rounded border border-dashed border-neutral-700 text-xs text-neutral-600">
-          Upload an image to preview
+          {status === "baking" ? "Rendering…" : "Upload an image to preview"}
         </div>
       )}
       {resizedFrames && (

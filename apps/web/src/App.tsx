@@ -1,12 +1,13 @@
-import type { CursorSize, Hotspot, StyleName, StyleParams } from "ani-core";
-import { useMemo, useState } from "react";
+import type { CursorSize, Hotspot } from "ani-core";
+import { useState } from "react";
 import { ExportPanel } from "./components/ExportPanel";
 import { HotspotPicker } from "./components/HotspotPicker";
 import { LivePreview } from "./components/LivePreview";
 import { StylePicker } from "./components/StylePicker";
 import { Uploader } from "./components/Uploader";
-import { deriveFrames } from "./lib/deriveFrames";
+import type { AnimationMode } from "./lib/animationMode";
 import type { SourceState } from "./lib/source";
+import { useBakedFrames } from "./lib/useBakedFrames";
 
 function baseName(fileName: string): string {
   const dot = fileName.lastIndexOf(".");
@@ -17,19 +18,16 @@ export default function App() {
   const [source, setSource] = useState<SourceState>({ kind: "none" });
   const [error, setError] = useState<string | null>(null);
 
-  const [style, setStyle] = useState<StyleName>("pulse");
+  const [mode, setMode] = useState<AnimationMode>({ engine: "classic", style: "pulse", params: {} });
   const [frameCount, setFrameCount] = useState(8);
   const [fps, setFps] = useState(12);
-  const [params, setParams] = useState<StyleParams>({});
   const [sizes, setSizes] = useState<CursorSize[]>([32]);
   const [hotspot, setHotspot] = useState<Hotspot | null>(null);
 
   const baseSize = sizes[0] ?? 32;
 
-  const frames = useMemo(
-    () => deriveFrames(source, { style, frameCount, fps, params }),
-    [source, style, frameCount, fps, params],
-  );
+  const baked = useBakedFrames(source, mode, frameCount, fps, baseSize);
+  const frames = baked.frames;
 
   const resolvedHotspot = hotspot ?? { x: Math.floor(baseSize / 2), y: Math.floor(baseSize / 2) };
   const firstFrame = frames?.[0] ?? null;
@@ -58,14 +56,12 @@ export default function App() {
           {source.kind !== "none" && (
             <StylePicker
               source={source}
-              style={style}
-              onStyleChange={setStyle}
+              mode={mode}
+              onModeChange={setMode}
               frameCount={frameCount}
               onFrameCountChange={setFrameCount}
               fps={fps}
               onFpsChange={setFps}
-              params={params}
-              onParamsChange={setParams}
               sizes={sizes}
               onSizesChange={setSizes}
             />
@@ -73,7 +69,8 @@ export default function App() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <LivePreview frames={frames} baseSize={baseSize} />
+          <LivePreview frames={frames} baseSize={baseSize} status={baked.status} />
+          {baked.status === "error" && baked.error && <p className="text-sm text-red-400">{baked.error}</p>}
 
           {firstFrame && (
             <HotspotPicker frame={firstFrame} baseSize={baseSize} hotspot={resolvedHotspot} onChange={setHotspot} />

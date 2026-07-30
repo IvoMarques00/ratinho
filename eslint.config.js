@@ -13,11 +13,30 @@ export default tseslint.config(
     },
   },
   {
-    files: [".claude/skills/**/*.mjs"],
+    files: [".claude/skills/**/*.mjs", "packages/render-core/scripts/**/*.mjs"],
     languageOptions: {
       globals: {
         process: "readonly",
         console: "readonly",
+        Buffer: "readonly",
+        // page.evaluate() callback bodies in these driver scripts
+        // genuinely reference browser globals that execute in-page.
+        document: "readonly",
+      },
+    },
+  },
+  {
+    // Playwright driver scripts: mostly Node, but page.evaluate() callback
+    // bodies genuinely reference browser globals (window, document) that
+    // execute in-page, not in this Node process.
+    files: ["packages/render-core/test-e2e/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        window: "readonly",
+        document: "readonly",
       },
     },
   },

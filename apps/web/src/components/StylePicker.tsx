@@ -1,22 +1,24 @@
-import type { CursorSize, StyleName, StyleParams } from "ani-core";
+import type { CursorSize, StyleName } from "ani-core";
+import { listEffects } from "render-core";
+import type { AnimationMode } from "../lib/animationMode";
 import type { SourceState } from "../lib/source";
+import { ShaderParamControls } from "./ShaderParamControls";
+import { Slider } from "./Slider";
 
 interface StylePickerProps {
   source: SourceState;
-  style: StyleName;
-  onStyleChange: (style: StyleName) => void;
+  mode: AnimationMode;
+  onModeChange: (mode: AnimationMode) => void;
   frameCount: number;
   onFrameCountChange: (n: number) => void;
   fps: number;
   onFpsChange: (n: number) => void;
-  params: StyleParams;
-  onParamsChange: (params: StyleParams) => void;
   sizes: CursorSize[];
   onSizesChange: (sizes: CursorSize[]) => void;
 }
 
 const ALL_SIZES: CursorSize[] = [32, 48, 64];
-const STYLES: { value: StyleName; label: string }[] = [
+const CLASSIC_STYLES: { value: StyleName; label: string }[] = [
   { value: "none", label: "None (static)" },
   { value: "pulse", label: "Pulse / breathe" },
   { value: "wiggle", label: "Wiggle / shake" },
@@ -24,40 +26,23 @@ const STYLES: { value: StyleName; label: string }[] = [
   { value: "rotate", label: "Rotate" },
 ];
 
-function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void }) {
-  return (
-    <label className="flex flex-col gap-1 text-xs text-neutral-400">
-      <span className="flex justify-between">
-        <span>{props.label}</span>
-        <span className="text-neutral-300">{props.value}</span>
-      </span>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-        className="accent-sky-500"
-      />
-    </label>
-  );
+const SHADER_EFFECTS = listEffects().filter((e) => e.id !== "passthrough");
+
+function modeToSelectValue(mode: AnimationMode): string {
+  return mode.engine === "classic" ? `classic:${mode.style}` : `shader:${mode.effectId}`;
 }
 
 export function StylePicker(props: StylePickerProps) {
-  const {
-    source,
-    style,
-    onStyleChange,
-    frameCount,
-    onFrameCountChange,
-    fps,
-    onFpsChange,
-    params,
-    onParamsChange,
-    sizes,
-    onSizesChange,
-  } = props;
+  const { source, mode, onModeChange, frameCount, onFrameCountChange, fps, onFpsChange, sizes, onSizesChange } = props;
+
+  function handleSelectChange(raw: string) {
+    const [engine, id] = raw.split(":");
+    if (engine === "classic") {
+      onModeChange({ engine: "classic", style: id as StyleName, params: {} });
+    } else {
+      onModeChange({ engine: "shader", effectId: id!, params: {} });
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,58 +74,67 @@ export function StylePicker(props: StylePickerProps) {
       ) : (
         <>
           <div>
-            <p className="text-sm font-medium text-neutral-200">Animation style</p>
+            <p className="text-sm font-medium text-neutral-200">Animation</p>
             <select
-              value={style}
-              onChange={(e) => onStyleChange(e.target.value as StyleName)}
+              value={modeToSelectValue(mode)}
+              onChange={(e) => handleSelectChange(e.target.value)}
               className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
             >
-              {STYLES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
+              <optgroup label="Classic (CPU · instant)">
+                {CLASSIC_STYLES.map((s) => (
+                  <option key={s.value} value={`classic:${s.value}`}>
+                    {s.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Shader (GPU · richer, ~1s)">
+                {SHADER_EFFECTS.map((e) => (
+                  <option key={e.id} value={`shader:${e.id}`}>
+                    {e.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
 
-          {style !== "none" && (
+          {mode.engine === "classic" && mode.style !== "none" && (
             <div className="flex flex-col gap-3 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
               <Slider label="Frames" value={frameCount} min={2} max={30} step={1} onChange={onFrameCountChange} />
               <Slider label="FPS" value={fps} min={2} max={30} step={1} onChange={onFpsChange} />
               <Slider
                 label="Amplitude"
-                value={params.amplitude ?? 0.1}
+                value={mode.params.amplitude ?? 0.1}
                 min={0.02}
                 max={0.5}
                 step={0.01}
-                onChange={(v) => onParamsChange({ ...params, amplitude: v })}
+                onChange={(v) => onModeChange({ ...mode, params: { ...mode.params, amplitude: v } })}
               />
-              {(style === "wiggle" || style === "bounce") && (
+              {(mode.style === "wiggle" || mode.style === "bounce") && (
                 <Slider
                   label="Cycles"
-                  value={params.cycles ?? (style === "bounce" ? 1 : 2)}
+                  value={mode.params.cycles ?? (mode.style === "bounce" ? 1 : 2)}
                   min={1}
                   max={6}
                   step={1}
-                  onChange={(v) => onParamsChange({ ...params, cycles: v })}
+                  onChange={(v) => onModeChange({ ...mode, params: { ...mode.params, cycles: v } })}
                 />
               )}
-              {(style === "wiggle" || style === "rotate") && (
+              {(mode.style === "wiggle" || mode.style === "rotate") && (
                 <Slider
                   label="Max angle (°)"
-                  value={params.maxAngleDeg ?? (style === "rotate" ? 25 : 8)}
+                  value={mode.params.maxAngleDeg ?? (mode.style === "rotate" ? 25 : 8)}
                   min={2}
                   max={90}
                   step={1}
-                  onChange={(v) => onParamsChange({ ...params, maxAngleDeg: v })}
+                  onChange={(v) => onModeChange({ ...mode, params: { ...mode.params, maxAngleDeg: v } })}
                 />
               )}
-              {style === "rotate" && (
+              {mode.style === "rotate" && (
                 <label className="flex items-center justify-between text-xs text-neutral-400">
                   <span>Mode</span>
                   <select
-                    value={params.rotateMode ?? "spin"}
-                    onChange={(e) => onParamsChange({ ...params, rotateMode: e.target.value as "spin" | "rock" })}
+                    value={mode.params.rotateMode ?? "spin"}
+                    onChange={(e) => onModeChange({ ...mode, params: { ...mode.params, rotateMode: e.target.value as "spin" | "rock" } })}
                     className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-200"
                   >
                     <option value="spin">Spin (full 360°)</option>
@@ -150,6 +144,25 @@ export function StylePicker(props: StylePickerProps) {
               )}
             </div>
           )}
+
+          {mode.engine === "shader" &&
+            (() => {
+              const effect = SHADER_EFFECTS.find((e) => e.id === mode.effectId);
+              if (!effect) return null;
+              return (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
+                    <Slider label="Frames" value={frameCount} min={2} max={30} step={1} onChange={onFrameCountChange} />
+                    <Slider label="FPS" value={fps} min={2} max={30} step={1} onChange={onFpsChange} />
+                  </div>
+                  <ShaderParamControls
+                    schema={effect.schema}
+                    params={mode.params}
+                    onParamsChange={(params) => onModeChange({ ...mode, params })}
+                  />
+                </div>
+              );
+            })()}
         </>
       )}
     </div>
