@@ -1,0 +1,44 @@
+{
+  "name": "ani-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./decode/browser": {
+      "types": "./dist/decode/browser.d.ts",
+      "import": "./dist/decode/browser.js",
+      "require": "./dist/decode/browser.cjs"
+    },
+    "./decode/node": {
+      "types": "./dist/decode/node.d.ts",
+      "import": "./dist/decode/node.js",
+      "require": "./dist/decode/node.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "gifuct-js": "^2.1.2",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/pngjs": "^6.0.5",
+    "omggif": "^1.0.10",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
+  }
+}

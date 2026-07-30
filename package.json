@@ -1,0 +1,28 @@
+{
+  "name": "ratinho",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "High-fidelity image to .ANI animated cursor converter",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/ani-core",
+    "test": "npm run test -w packages/ani-core",
+    "typecheck": "tsc -b --force",
+    "lint": "eslint .",
+    "dev:web": "npm run dev -w apps/web",
+    "build:web": "npm run build -w apps/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
