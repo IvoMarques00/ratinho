@@ -1,16 +1,15 @@
 /// <reference lib="dom" />
 // Browser-side harness: a self-contained global (bundles render-core's GL
-// layer + ani-core's resizeRGBA) that Node/Playwright injects into a
-// headless page via page.addScriptTag, and that the interactive web app
-// could in principle load the same way for parity testing. Talks to Node
+// layer + ani-core's resizeRGBA/resolveParams) that Node/Playwright
+// injects into a headless page via page.addScriptTag. Talks to Node
 // exclusively via plain JSON + base64 so it works across the
-// page.evaluate() boundary without relying on typed-array transfer.
-import type { Frame, RGBAImage } from "ani-core";
-import { resizeRGBA } from "ani-core";
-import { getEffect, listEffects } from "../effects/index.js";
-import { ShaderRenderer } from "../gl/renderer.js";
-import { resolveParams } from "../schema.js";
-import { delayMsForFps } from "../timing.js";
+// page.evaluate() boundary without relying on typed-array transfer. Its
+// only job is (de)serialization — the actual rendering is bakeCursorFrames()
+// from ../bake.js, the same function the interactive web app calls
+// directly, so both paths render identically by construction.
+import type { RGBAImage } from "ani-core";
+import { bakeCursorFrames } from "../bake.js";
+import { listEffects } from "../effects/index.js";
 
 function decodeBase64ToBytes(b64: string): Uint8Array {
   const binary = atob(b64);
@@ -49,21 +48,11 @@ export interface BakedFramePayload {
   rgbaBase64: string;
 }
 
-function autoSupersample(size: number): number {
-  return Math.min(4, Math.max(1, Math.floor(256 / size)));
-}
-
 export function listEffectIds(): string[] {
   return listEffects().map((e) => e.id);
 }
 
 export function bakeFrames(req: BakeRequest): BakedFramePayload[] {
-  const effect = getEffect(req.effectId);
-  const resolved = resolveParams(effect.schema, req.params ?? {});
-  const supersample = req.supersample ?? autoSupersample(req.size);
-  const renderSize = req.size * supersample;
-  const canvasSize = Math.round(renderSize * (1 + 2 * effect.padding));
-
   const sourceImage: RGBAImage = {
     width: req.sourceWidth,
     height: req.sourceHeight,
@@ -71,29 +60,21 @@ export function bakeFrames(req: BakeRequest): BakedFramePayload[] {
   };
 
   const canvas = document.createElement("canvas");
-  canvas.width = canvasSize;
-  canvas.height = canvasSize;
-  const renderer = new ShaderRenderer(canvas);
+  const frames = bakeCursorFrames(canvas, {
+    effectId: req.effectId,
+    sourceImage,
+    size: req.size,
+    frameCount: req.frameCount,
+    fps: req.fps,
+    supersample: req.supersample,
+    seed: req.seed,
+    params: req.params,
+  });
 
-  const delayMs = delayMsForFps(req.fps);
-  const out: BakedFramePayload[] = [];
-  try {
-    for (let i = 0; i < req.frameCount; i++) {
-      const rendered = renderer.renderFrame(effect, resolved, {
-        frameIndex: i,
-        frameCount: req.frameCount,
-        fps: req.fps,
-        seed: req.seed ?? 0,
-        sourceImage,
-        canvasSize,
-        supersample,
-      });
-      const final: Frame = { ...resizeRGBA(rendered, req.size, req.size), delayMs };
-      out.push({ width: final.width, height: final.height, delayMs: final.delayMs, rgbaBase64: encodeBytesToBase64(final.data) });
-    }
-  } finally {
-    renderer.dispose();
-  }
-  return out;
+  return frames.map((f) => ({
+    width: f.width,
+    height: f.height,
+    delayMs: f.delayMs,
+    rgbaBase64: encodeBytesToBase64(f.data),
+  }));
 }
-
