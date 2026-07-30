@@ -1,0 +1,50 @@
+{
+  "name": "render-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./gl": {
+      "types": "./dist/gl-entry.d.ts",
+      "import": "./dist/gl-entry.js",
+      "require": "./dist/gl-entry.cjs"
+    },
+    "./node": {
+      "types": "./dist/node-entry.d.ts",
+      "import": "./dist/node-entry.js",
+      "require": "./dist/node-entry.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:gl": "vitest run --config vitest.e2e.config.ts",
+    "check:gl": "node scripts/check-webgl.mjs"
+  },
+  "dependencies": {
+    "ani-core": "*"
+  },
+  "peerDependencies": {
+    "playwright-core": "*"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
+  }
+}
