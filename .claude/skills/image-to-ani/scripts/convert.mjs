@@ -7,8 +7,10 @@ import {
   convertImageToAni,
   convertImageToCur,
   detectImageFormat,
+  framesToAni,
 } from "ani-core";
 import { decodeImageNode } from "ani-core/decode/node";
+import { coerceFromCliStrings, describeSchema, getEffect, listEffects } from "render-core";
 
 const HELP = `Usage: node convert.mjs --input <file.png|jpg|jpeg|gif> --out <file.ani|.cur> [options]
 
@@ -16,7 +18,8 @@ Required:
   --input <path>        Source image: PNG, JPEG, or animated GIF.
   --out <path>           Output path. Written as .ani unless --format cur.
 
-Animation (ignored for GIF input, which drives its own frames):
+Animation, CPU/classic (instant, no extra dependencies; ignored for GIF
+input, which drives its own frames):
   --style <name>          none | pulse | wiggle | bounce | rotate  (default: none)
   --frames <n>             Frame count for the synthesized animation (default: 8)
   --fps <n>                 Playback rate in frames per second (default: 12)
@@ -24,6 +27,16 @@ Animation (ignored for GIF input, which drives its own frames):
   --cycles <n>               Oscillation cycles per loop (wiggle/bounce)
   --max-angle <deg>          Max rotation angle in degrees (wiggle "shake" / rotate "rock")
   --rotate-mode <spin|rock>  Rotate style mode (default: spin)
+
+Animation, GPU/shader (richer effects — bloom, chromatic aberration —
+but launches a headless Chromium, ~1-3s; not supported for GIF input;
+mutually exclusive with --style):
+  --effect <id>            Shader effect id, e.g. "bloom-pulse" or "prism-spin"
+  --effect-param k=v         Repeatable. Value type/range depends on the effect
+                              (run --list-effects to see each effect's params)
+  --supersample <1..4>       Internal render resolution multiplier (default: auto)
+  --seed <n>                  Deterministic seed passed to the effect (default: 0)
+  --list-effects            Print available shader effects and their params, then exit
 
 Cursor options:
   --size <n[,n...]>    Cursor pixel size(s) to embed, e.g. "32" or "32,48" (default: 32)
@@ -34,6 +47,8 @@ Examples:
   node convert.mjs --input logo.png --out cursor.ani --style pulse --frames 8 --fps 12
   node convert.mjs --input photo.jpg --out pointer.cur --format cur --hotspot 4,4
   node convert.mjs --input dance.gif --out dance.ani --size 32,48
+  node convert.mjs --input logo.png --out glow.ani --effect bloom-pulse --effect-param intensity=1.8
+  node convert.mjs --list-effects
 `;
 
 function fail(message) {
@@ -59,6 +74,35 @@ function parseHotspot(raw) {
   return { x: parts[0], y: parts[1] };
 }
 
+function parseEffectParamPairs(pairs) {
+  const raw = {};
+  for (const pair of pairs) {
+    const eq = pair.indexOf("=");
+    if (eq === -1) {
+      fail(`Invalid --effect-param "${pair}", expected "key=value" (e.g. "intensity=1.8").`);
+    }
+    raw[pair.slice(0, eq)] = pair.slice(eq + 1);
+  }
+  return raw;
+}
+
+function printEffectList() {
+  const effects = listEffects();
+  for (const effect of effects) {
+    process.stdout.write(`\n${effect.id} — ${effect.label}\n  ${effect.description}\n`);
+    const fields = describeSchema(effect.schema);
+    if (fields.length === 0) {
+      process.stdout.write(`  (no params)\n`);
+      continue;
+    }
+    for (const f of fields) {
+      const range = f.range ? ` [${f.range}]` : f.options ? ` {${f.options.join("|")}}` : "";
+      process.stdout.write(`  --effect-param ${f.key}=<${f.type}>${range} (default: ${JSON.stringify(f.default)}) — ${f.label}\n`);
+    }
+  }
+  process.stdout.write("\n");
+}
+
 const { values } = parseArgs({
   options: {
     input: { type: "string" },
@@ -70,6 +114,11 @@ const { values } = parseArgs({
     cycles: { type: "string" },
     "max-angle": { type: "string" },
     "rotate-mode": { type: "string" },
+    effect: { type: "string" },
+    "effect-param": { type: "string", multiple: true, default: [] },
+    supersample: { type: "string" },
+    seed: { type: "string" },
+    "list-effects": { type: "boolean", default: false },
     size: { type: "string", default: "32" },
     hotspot: { type: "string" },
     format: { type: "string", default: "ani" },
@@ -79,6 +128,11 @@ const { values } = parseArgs({
 
 if (values.help) {
   process.stdout.write(HELP);
+  process.exit(0);
+}
+
+if (values["list-effects"]) {
+  printEffectList();
   process.exit(0);
 }
 
@@ -95,6 +149,19 @@ if (!validStyles.includes(values.style)) {
   fail(`Unsupported --style "${values.style}". Use one of: ${validStyles.join(", ")}.`);
 }
 
+if (values.effect && values.style !== "none") {
+  fail(`--effect and --style are mutually exclusive (--effect uses the GPU/shader path; --style uses the CPU/classic path).`);
+}
+
+let effect;
+if (values.effect) {
+  try {
+    effect = getEffect(values.effect);
+  } catch (err) {
+    fail(err.message);
+  }
+}
+
 const sizes = parseSizeList(values.size);
 const hotspot = values.hotspot ? parseHotspot(values.hotspot) : undefined;
 const frameCount = Number.parseInt(values.frames, 10);
@@ -105,6 +172,15 @@ if (values.amplitude !== undefined) params.amplitude = Number.parseFloat(values.
 if (values.cycles !== undefined) params.cycles = Number.parseInt(values.cycles, 10);
 if (values["max-angle"] !== undefined) params.maxAngleDeg = Number.parseFloat(values["max-angle"]);
 if (values["rotate-mode"] !== undefined) params.rotateMode = values["rotate-mode"];
+
+let effectParams;
+if (effect) {
+  try {
+    effectParams = coerceFromCliStrings(effect.schema, parseEffectParamPairs(values["effect-param"]));
+  } catch (err) {
+    fail(err.message);
+  }
+}
 
 let inputBytes;
 try {
@@ -120,11 +196,36 @@ try {
   fail(err.message);
 }
 
+if (effect && format === "gif") {
+  fail(`--effect (shader path) doesn't yet support GIF input — use a static PNG/JPEG source, or omit --effect to use the GIF's own frames with --style.`);
+}
+
 let outputBytes;
 let frameCountUsed;
 
 try {
-  if (format === "gif") {
+  if (effect) {
+    const { renderFramesHeadless } = await import("render-core/node");
+    const image = decodeImageNode(inputBytes);
+    const frames = await renderFramesHeadless({
+      effectId: effect.id,
+      sourceImage: image,
+      size: sizes[0],
+      frameCount,
+      fps,
+      supersample: values.supersample !== undefined ? Number.parseInt(values.supersample, 10) : undefined,
+      seed: values.seed !== undefined ? Number.parseInt(values.seed, 10) : undefined,
+      params: effectParams,
+    });
+    if (values.format === "cur") {
+      outputBytes = convertImageToCur(frames[0], { sizes, hotspot });
+      frameCountUsed = 1;
+    } else {
+      const result = framesToAni(frames, { sizes, hotspot });
+      outputBytes = result.bytes;
+      frameCountUsed = result.frameCount;
+    }
+  } else if (format === "gif") {
     if (values.format === "cur") {
       fail("GIF input cannot be exported as a static .cur; use --format ani (the default).");
     }

@@ -10,7 +10,10 @@ Converts a static image (PNG/JPEG) or an animated GIF into a real Windows
 wrapper around the `ani-core` package (`packages/ani-core`), which also
 powers the browser-based converter app in `apps/web` — both produce
 byte-identical output for the same inputs, since they share the same
-encoder.
+encoder. Richer GPU-shader animation (`--effect`) is powered by
+`packages/render-core`, which renders through the same headless-Chromium
+engine the interactive app's browser uses, so the shader path also stays
+in parity with what the web app previews.
 
 ## When to use this
 
@@ -44,6 +47,32 @@ full flag reference. Key options:
   image center).
 - `--format <ani|cur>` — output container (default `ani`).
 
+## Shader effects (GPU, richer than `--style`)
+
+For more elaborate motion than the CPU `--style` styles can express (real
+bloom/glow, chromatic aberration, per-channel color fringing), use
+`--effect` instead of `--style`. These render via WebGL in a headless
+Chromium (`packages/render-core`), so they take longer (~1-3s vs.
+instant) and require that browser to be available — but the exact same
+rendering code also powers the web app's live preview, so what you see
+there is exactly what gets exported.
+
+- `--effect <id>` — shader effect id (e.g. `bloom-pulse`, `prism-spin`).
+  Mutually exclusive with `--style`.
+- `--effect-param key=value` — repeatable. Valid keys/types/ranges are
+  per-effect; run `--list-effects` to see them. Numbers, booleans, and
+  colors (`"r,g,b,a"` 0..1 or `"#rrggbb"`/`"#rrggbbaa"`) are all supported.
+- `--supersample <1..4>` — internal render resolution multiplier (default:
+  chosen automatically from `--size`).
+- `--list-effects` — print every available effect with its full param
+  list, defaults, and ranges. Doesn't require `--input`/`--out`.
+- Not yet supported for GIF input (a static PNG/JPEG source only) — for
+  GIF input, use `--style` (or no style) to keep the GIF's own frames.
+
+```
+node .claude/skills/image-to-ani/scripts/convert.mjs --list-effects
+```
+
 ## Examples
 
 Animated cursor from a logo, with a gentle pulse:
@@ -66,11 +95,25 @@ node .claude/skills/image-to-ani/scripts/convert.mjs \
   --input dance.gif --out dance.ani
 ```
 
+A glowing neon-bloom cursor via the GPU shader path:
+```
+node .claude/skills/image-to-ani/scripts/convert.mjs \
+  --input logo.png --out glow.ani \
+  --effect bloom-pulse --effect-param intensity=1.8 --effect-param tint="#ffcc88" \
+  --frames 8 --fps 12
+```
+
 ## Prerequisites
 
 `ani-core` must be built once before first use (`npm install && npm run
 build -w packages/ani-core` from the repo root). If the script fails with a
 module-resolution error mentioning `ani-core`, run that build first.
+
+For `--effect` (the shader path), `render-core` must also be built
+(`npm run build -w packages/render-core`), and a headless-Chromium-capable
+`playwright-core` install is required — both are already set up in this
+environment. Run `node packages/render-core/scripts/check-webgl.mjs` to
+diagnose if the shader path fails to launch.
 
 ## Notes on fidelity
 
