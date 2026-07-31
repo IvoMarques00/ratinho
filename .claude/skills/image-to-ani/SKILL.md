@@ -47,7 +47,7 @@ full flag reference. Key options:
   image center).
 - `--format <ani|cur>` — output container (default `ani`).
 
-## Shader effects (GPU, richer than `--style`)
+## Shader effects (GPU, richer than `--style`) — Experimental
 
 For more elaborate motion than the CPU `--style` styles can express (real
 bloom/glow, chromatic aberration, per-channel color fringing), use
@@ -56,6 +56,11 @@ Chromium (`packages/render-core`), so they take longer (~1-3s vs.
 instant) and require that browser to be available — but the exact same
 rendering code also powers the web app's live preview, so what you see
 there is exactly what gets exported.
+
+**Experimental**: this path has only ever been validated against headless
+Chromium's SwiftShader software renderer (this sandbox's own headless
+Chromium). Real-GPU/browser driver behavior (a user's actual Chrome,
+Firefox, Safari, or mobile browser) hasn't been verified.
 
 - `--effect <id>` — shader effect id (e.g. `bloom-pulse`, `prism-spin`).
   Mutually exclusive with `--style`.

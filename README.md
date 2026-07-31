@@ -22,6 +22,10 @@ Animation comes from two engines that plug into the same encoder:
   same rendering code runs in the interactive browser app and, headlessly
   via Playwright/Chromium, in the CLI — so what the web app previews is
   byte-for-byte what gets exported, verified in `scripts/verify-shader-parity.mjs`.
+  **Experimental**: only validated against headless Chromium's SwiftShader
+  software renderer so far — real-GPU/browser behavior (Firefox, Safari,
+  mobile) is unverified. The web app detects WebGL2 availability and
+  disables the shader options with an explanation if unsupported.
 
 A cursor-pack generator (bundling a full set of Windows cursor roles) is
 the next planned step, intentionally not built yet.

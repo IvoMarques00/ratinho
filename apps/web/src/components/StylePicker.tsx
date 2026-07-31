@@ -2,6 +2,7 @@ import type { CursorSize, StyleName } from "ani-core";
 import { listEffects } from "render-core";
 import type { AnimationMode } from "../lib/animationMode";
 import type { SourceState } from "../lib/source";
+import { webgl2Supported } from "../lib/webgl";
 import { ShaderParamControls } from "./ShaderParamControls";
 import { Slider } from "./Slider";
 
@@ -87,14 +88,31 @@ export function StylePicker(props: StylePickerProps) {
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="Shader (GPU · richer, ~1s)">
+              <optgroup
+                label={
+                  webgl2Supported
+                    ? "Shader (GPU · richer, ~1s) — Experimental"
+                    : "Shader (GPU · richer, ~1s) — Experimental, unavailable in this browser"
+                }
+              >
                 {SHADER_EFFECTS.map((e) => (
-                  <option key={e.id} value={`shader:${e.id}`}>
+                  <option
+                    key={e.id}
+                    value={`shader:${e.id}`}
+                    disabled={!webgl2Supported}
+                    title={webgl2Supported ? undefined : "Shader effects need WebGL2, which isn't available in this browser."}
+                  >
                     {e.label}
                   </option>
                 ))}
               </optgroup>
             </select>
+            {!webgl2Supported && (
+              <p className="mt-2 text-xs text-amber-500">
+                Shader effects need WebGL2, unavailable in this browser or device. Classic (CPU) styles still work
+                fully.
+              </p>
+            )}
           </div>
 
           {mode.engine === "classic" && mode.style !== "none" && (
@@ -151,6 +169,10 @@ export function StylePicker(props: StylePickerProps) {
               if (!effect) return null;
               return (
                 <div className="flex flex-col gap-3">
+                  <p className="rounded-lg border border-amber-900/50 bg-amber-950/30 p-3 text-xs text-amber-500">
+                    Experimental — validated on software-rendered Chromium only; real-GPU/browser behavior (Firefox,
+                    Safari, mobile) hasn't been verified yet.
+                  </p>
                   <div className="flex flex-col gap-3 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
                     <Slider label="Frames" value={frameCount} min={2} max={30} step={1} onChange={onFrameCountChange} />
                     <Slider label="FPS" value={fps} min={2} max={30} step={1} onChange={onFpsChange} />

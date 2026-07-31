@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# NOTE: this intentionally does NOT run packages/render-core's GPU/E2E
+# suite (`npm run test:gl`). Those scripts default to a Chromium path
+# specific to the sandboxed dev environment they were built in
+# (/opt/pw-browsers/chromium) and exercise real WebGL2 rendering via
+# headless Chromium/SwiftShader — making that reliable on a stock
+# ubuntu-latest runner needs `playwright install --with-deps chromium`
+# plus handling known SwiftShader/ANGLE-in-container flakiness. Treat
+# `npm run test:gl -w packages/render-core` as a manual/local pre-release
+# check for now; wiring it into CI is a deliberate fast-follow, not an
+# oversight.
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build ani-core
+        run: npm run build -w packages/ani-core
+
+      - name: Build render-core
+        run: npm run build -w packages/render-core
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test ani-core
+        run: npm run test -w packages/ani-core
+
+      - name: Test render-core (pure/GPU-free unit tests only)
+        run: npm run test -w packages/render-core
+
+      - name: Build web app
+        run: npm run build:web

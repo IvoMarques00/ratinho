@@ -42,21 +42,31 @@ export function LivePreview({ frames, baseSize, status = "ready" }: LivePreviewP
       ctx.putImageData(new ImageData(frame.data, baseSize, baseSize), 0, 0);
     }
 
+    let stopped = false;
+
     function tick(timestamp: number) {
-      if (!resizedFrames) return;
-      if (lastTimestamp === null) {
-        lastTimestamp = timestamp;
-        draw();
-      } else {
-        const dt = timestamp - lastTimestamp;
-        lastTimestamp = timestamp;
-        elapsedInFrame += dt;
-        const currentDelay = Math.max(16, resizedFrames[index]!.delayMs);
-        if (elapsedInFrame >= currentDelay) {
-          elapsedInFrame -= currentDelay;
-          index = (index + 1) % resizedFrames.length;
+      if (!resizedFrames || stopped) return;
+      try {
+        if (lastTimestamp === null) {
+          lastTimestamp = timestamp;
           draw();
+        } else {
+          const dt = timestamp - lastTimestamp;
+          lastTimestamp = timestamp;
+          elapsedInFrame += dt;
+          const currentDelay = Math.max(16, resizedFrames[index]!.delayMs);
+          if (elapsedInFrame >= currentDelay) {
+            elapsedInFrame -= currentDelay;
+            index = (index + 1) % resizedFrames.length;
+            draw();
+          }
         }
+      } catch (err) {
+        // Not render-phase, so an ErrorBoundary can't catch this — stop
+        // the loop instead of spamming console.error every frame.
+        stopped = true;
+        console.error("LivePreview animation loop stopped after an error:", err);
+        return;
       }
       rafId = requestAnimationFrame(tick);
     }
