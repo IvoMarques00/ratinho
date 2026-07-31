@@ -11,4 +11,14 @@ export const GLSL_LIB: Record<string, string> = {
   unpremultiplyColor: `vec3 unpremultiplyColor(vec4 c) { return c.a > 0.0 ? c.rgb / c.a : vec3(0.0); }\n`,
   sampleClamped: `vec4 sampleClamped(sampler2D tex, vec2 uv) { return (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) ? vec4(0.0) : texture(tex, uv); }\n`,
   hash12: `float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }\n`,
+  vignette: `float vignette(vec2 uv, vec2 center, float radius, float softness) { return 1.0 - smoothstep(radius - softness, radius, distance(uv, center)); }\n`,
+  hueRotate: `vec3 hueRotate(vec3 c, float a) {
+  float cA = cos(a), sA = sin(a);
+  mat3 m = mat3(
+    0.299 + 0.701 * cA + 0.168 * sA, 0.587 - 0.587 * cA + 0.330 * sA, 0.114 - 0.114 * cA - 0.497 * sA,
+    0.299 - 0.299 * cA - 0.328 * sA, 0.587 + 0.413 * cA + 0.035 * sA, 0.114 - 0.114 * cA + 0.292 * sA,
+    0.299 - 0.300 * cA + 1.250 * sA, 0.587 - 0.588 * cA - 1.050 * sA, 0.114 + 0.886 * cA - 0.203 * sA
+  );
+  return clamp(m * c, 0.0, 1.0);
+}\n`,
 };
