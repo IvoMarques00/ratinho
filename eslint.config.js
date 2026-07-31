@@ -13,12 +13,15 @@ export default tseslint.config(
     },
   },
   {
-    files: [".claude/skills/**/*.mjs", "packages/render-core/scripts/**/*.mjs"],
+    files: [".claude/skills/**/*.mjs", "packages/render-core/scripts/**/*.mjs", "scripts/**/*.mjs"],
     languageOptions: {
       globals: {
         process: "readonly",
         console: "readonly",
         Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        fetch: "readonly",
         // page.evaluate() callback bodies in these driver scripts
         // genuinely reference browser globals that execute in-page.
         document: "readonly",
