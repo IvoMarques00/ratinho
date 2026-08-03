@@ -1,5 +1,11 @@
 # Ratinho — Image → .ANI Cursor Converter
 
+> This repository also hosts Ivo's Personal Master Architecture (PMA) — the
+> long-term system for organizing his work, projects, and knowledge,
+> including this app as its first documented project. See
+> [`CLAUDE.md`](CLAUDE.md) for the map. It lives entirely outside `apps/`,
+> `packages/`, and `.claude/skills/`, so it doesn't affect anything below.
+
 Converts a JPG, JPEG, PNG, or animated GIF into a high-fidelity Windows
 `.ani` animated cursor (or a static `.cur`/`.ico`). Two ways to use it,
 one shared implementation:
